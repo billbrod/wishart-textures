@@ -1,0 +1,3 @@
+# this is temporary
+git+https://github.com/LabForComputationalVision/plenoptic.git@psMinStats
+click
