@@ -1,0 +1,22 @@
+images_dict:
+  /mnt/ceph/users/ccn/common_data/texture_images/fig4a.jpg: .5
+  /mnt/ceph/users/ccn/common_data/texture_images/fig4b.jpg: .5
+
+synth_iter: 1000
+
+change_scale_criterion: None
+ctf_iters_to_check: 3
+
+opt_hyperparams:
+  lr: .02
+  amsgrad: True
+
+model_params:
+  n_scales: 4
+  n_orientations: 4
+  spatial_corr_width: 7
+  use_true_correlations: True
+
+img_init: "random"
+
+device: "cpu"
