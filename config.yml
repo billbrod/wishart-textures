@@ -4,8 +4,8 @@
 # all be non-negative and sum to 1. Any images with a weight of zero will be
 # ignored.
 images_dict:
-  /mnt/simons/ccn/common_data/texture_images/fig4a.jpg: .5
-  /mnt/simons/ccn/common_data/texture_images/fig4b.jpg: .5
+  /mnt/simons/ccn/common_data/texture_images/fig14e.jpg: .5
+  /mnt/simons/ccn/common_data/texture_images/fig15e.jpg: .5
 
 # Whether to run synthesis on the GPU or CPU. GPU is much faster.
 device: "cpu"
