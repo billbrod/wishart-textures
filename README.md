@@ -28,8 +28,8 @@ metamer that matches that mixed representation.
 That is, let $M$ be the Portilla-Simoncelli texture model, $x_i$ be natural
 texture image $i$, $M(x_i)$ be the texture representation of $x_i$ (a vector
 containing about 700 values) and $\alpha_i$ be the relative weight of that
-image. We ensure that $\alpha_i > 0 \forall i$ and $\sum_i \alpha_i = 1$, and
-create a metamer $\hat{x}$, which satisfies $\argmin_{\hat{x}} (\sum_i\alpha_i
+image. We ensure that $\alpha_i > 0\ \ \forall i$ and $\sum_i \alpha_i = 1$, and
+synthesize a metamer $\hat{x}$, which satisfies $argmin_{\hat{x}} (\sum_i\alpha_i
 M(x_{i}) - M(\hat{x}))^2$.
 
 To synthesize these textures, call
