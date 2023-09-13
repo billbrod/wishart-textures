@@ -5,7 +5,7 @@ import os
 import os.path as op
 import shutil
 from datetime import datetime
-from typing import Dict, Literal, Optional
+from typing import Dict, Literal, Optional, Tuple
 
 import git
 import imageio
@@ -13,11 +13,12 @@ import numpy as np
 import plenoptic as po
 import torch
 import yaml
+from torch import Tensor
 
 from .models import MetamerMixture, PortillaSimoncelliMinimalMixture
 
 
-def read_yml(config_path: str):
+def read_yml(config_path: str) -> dict:
     """Read config from path and parse Nones."""
     with open(config_path) as f:
         kwargs = yaml.safe_load(f.read())
@@ -31,10 +32,15 @@ def read_yml(config_path: str):
     return kwargs
 
 
-def prep_imgs(imgs_dict: Dict[str, float], device: Literal["cpu", "gpu"]):
+def prep_imgs(
+    imgs_dict: Dict[str, float],
+    device: Literal["cpu", "gpu"],
+) -> Tuple(Tensor, Tensor):
     """Prepare images.
 
     All images are grayscale and rescaled to lie in the range [0, 1].
+
+    If any of the weights in imgs_dict are 0, we skip that image.
 
     If any weight is negative or if their sum is not 1, this raises a
     ValueError.
@@ -47,10 +53,19 @@ def prep_imgs(imgs_dict: Dict[str, float], device: Literal["cpu", "gpu"]):
     device :
         Which device to put tensors on.
 
+    Returns
+    -------
+    images :
+        4d tensor of images of shape (k, 1, h, w).
+    weights :
+        1d tensor of weights of shape (k,)
+
     """
     imgs = []
     weights = []
     for k, v in imgs_dict.items():
+        if v == 0:
+            continue
         imgs.append(k)
         weights.append(v)
     imgs = po.load_images(imgs).to(device)
@@ -71,7 +86,7 @@ def generate_texture(
     model_params: Dict = {},
     img_init: str = "random",
     device: Literal["cpu", "gpu"] = "cpu",
-):
+) -> MetamerMixture:
     """Prepare images, model and generate a mixed texture!
 
     Parameters
@@ -102,6 +117,11 @@ def generate_texture(
         is the overall mean as the input images.
     device :
         Which device to put tensors on.
+
+    Returns
+    -------
+    metamer :
+        The MetamerMixture object, with synthesis completed.
 
     """
     imgs, weights = prep_imgs(images_dict, device)
