@@ -7,6 +7,7 @@ import shutil
 from datetime import datetime
 from typing import Dict, Literal, Optional, Tuple
 
+import click
 import git
 import imageio
 import numpy as np
@@ -15,8 +16,8 @@ import torch
 import yaml
 from torch import Tensor
 
-from .models import MetamerMixture, PortillaSimoncelliMinimalMixture
 from . import display
+from .models import MetamerMixture, PortillaSimoncelliMinimalMixture
 
 
 def read_yml(config_path: str) -> dict:
@@ -91,7 +92,10 @@ def prep_imgs(
 
 def generate_texture(
     images_dict: Dict[str, float],
-    metamer_synthesis_params: Dict = {'change_scale_criterion': None, 'ctf_iters_to_check': 3},
+    metamer_synthesis_params: Dict = {
+        "change_scale_criterion": None,
+        "ctf_iters_to_check": 3,
+    },
     opt_hyperparams: Dict = {"lr": 0.02, "amsgrad": True},
     model_params: Dict = {},
     img_init: str = "random",
@@ -149,15 +153,12 @@ def generate_texture(
     return met
 
 
-# ADD:
-# - create output plots:
-#   - imshow with input images (relative weights in title) and metamer
-#   - representation of each input image, then representation error (maybe in separate)?
-#   - synthesis status with just metamer and loss and pixel vals?
-# - save output plots
 # - add command-line function to run PSMinimal model on an image and save output?
 #   - along with mixture?
 # - add something to load in metamer, directly from output dir
+@click.command()
+@click.argument("config_path")
+@click.argument("output_dir")
 def main(config_path: str, output_dir: str):
     """Create metamer, based on config, and save outputs.
 
@@ -195,7 +196,9 @@ def main(config_path: str, output_dir: str):
     metamer_img = np.clip(po.to_numpy(met.metamer), 0, 1)
     metamer_img = (metamer_img * np.iinfo(np.uint8).max).astype(np.uint8)
     imageio.imsave(op.join(output_dir, "metamer.png"), metamer_img)
-    fig = po.synth.metamer.plot_synthesis_status(met, included_plots=['display_metamer', 'plot_loss'])
+    fig = po.synth.metamer.plot_synthesis_status(
+        met, included_plots=["display_metamer", "plot_loss"]
+    )
     fig.savefig(op.join(output_dir, "synthesis_status.svg"))
     fig = display.input_comparison(met)
     fig.savefig(op.join(output_dir, "input_comparison.svg"))

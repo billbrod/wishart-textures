@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
-import torch
+from collections import OrderedDict
+
 import numpy as np
 import plenoptic as po
-from collections import OrderedDict
+import torch
 
 
 class PortillaSimoncelliMinimalMixture(po.simul.PortillaSimoncelli):
@@ -44,6 +45,7 @@ class PortillaSimoncelliMinimalMixture(po.simul.PortillaSimoncelli):
         if True, use the true correlations, otherwise use covariances
 
     """
+
     def __init__(
         self,
         im_shape,
@@ -53,10 +55,13 @@ class PortillaSimoncelliMinimalMixture(po.simul.PortillaSimoncelli):
         spatial_corr_width=7,
         use_true_correlations=True,
     ):
-        super().__init__(im_shape, n_scales=n_scales,
-                         n_orientations=n_orientations,
-                         spatial_corr_width=spatial_corr_width,
-                         use_true_correlations=use_true_correlations)
+        super().__init__(
+            im_shape,
+            n_scales=n_scales,
+            n_orientations=n_orientations,
+            spatial_corr_width=spatial_corr_width,
+            use_true_correlations=use_true_correlations,
+        )
         self.im_weights = im_weights
         # Turn the mask dictionary into a vector
         statistics_mask = self.mask_extra_statistics()
@@ -71,8 +76,10 @@ class PortillaSimoncelliMinimalMixture(po.simul.PortillaSimoncelli):
                 new_stats_mask[k] = v.unsqueeze(0).unsqueeze(0)
             self.statistics_mask = self.convert_to_vector(new_stats_mask)
         # make representation_scales the same size
-        self.representation_scales = np.array(self.representation_scales)[self.statistics_mask.squeeze()]
-       # need to make sure the numbers are ints
+        self.representation_scales = np.array(self.representation_scales)[
+            self.statistics_mask.squeeze()
+        ]
+        # need to make sure the numbers are ints
         rep_scales = []
         for i in self.representation_scales:
             try:
@@ -97,11 +104,13 @@ class PortillaSimoncelliMinimalMixture(po.simul.PortillaSimoncelli):
 
         #### pixel_statistics ####
         # All in original statistics
-        mask_original['pixel_statistics'] = torch.tensor([True] * 6)
+        mask_original["pixel_statistics"] = torch.tensor([True] * 6)
 
         #### magnitude_means ####
         # Not in original paper
-        mask_original['magnitude_means'] = torch.tensor([False] * ((n_scales * n_orientations) + 2))
+        mask_original["magnitude_means"] = torch.tensor(
+            [False] * ((n_scales * n_orientations) + 2)
+        )
 
         #### auto_correlation_magnitude ####
         # Symmetry M_{i,j} = M_{n-i+1, n_j+1}
@@ -111,75 +120,78 @@ class PortillaSimoncelliMinimalMixture(po.simul.PortillaSimoncelli):
         tril_inds = torch.tril_indices(n, n)
         acm_mask[tril_inds[0], tril_inds[1], :, :] = 1
         # Set repeated diagnoal elements to 0
-        diag_repeated = torch.arange(start=(n+1)/2, end=n, dtype=torch.long)
+        diag_repeated = torch.arange(start=(n + 1) / 2, end=n, dtype=torch.long)
         acm_mask[diag_repeated, diag_repeated, :, :] = 0
-        mask_original['auto_correlation_magnitude'] = acm_mask.bool()
+        mask_original["auto_correlation_magnitude"] = acm_mask.bool()
 
         #### skew_reconstructed, kurtosis_reconstructed ####
         # All in original paper
-        mask_original['skew_reconstructed'] = torch.tensor([True] * (n_scales + 1))
-        mask_original['kurtosis_reconstructed'] = torch.tensor([True] * (n_scales + 1))
+        mask_original["skew_reconstructed"] = torch.tensor([True] * (n_scales + 1))
+        mask_original["kurtosis_reconstructed"] = torch.tensor([True] * (n_scales + 1))
 
         #### auto_correlation_reconstructed ####
         # Symmetry M_{i,j} = M_{n-i+1, n-j+1}
-        acr_mask = torch.zeros((n, n, n_scales+1))
+        acr_mask = torch.zeros((n, n, n_scales + 1))
         # Reuse templates from acm
         acr_mask[tril_inds[0], tril_inds[1], :] = 1
         acr_mask[diag_repeated, diag_repeated, :] = 0
-        mask_original['auto_correlation_reconstructed'] = acr_mask.bool()
+        mask_original["auto_correlation_reconstructed"] = acr_mask.bool()
         if self.use_true_correlations:
             # std_reconstructed holds the center values of the
             # auto_correlation_reconstructed matrices. Which are turned
             # to 1's when using correlations
-            mask_original['std_reconstructed'] = torch.tensor([True] * (n_scales + 1))
+            mask_original["std_reconstructed"] = torch.tensor([True] * (n_scales + 1))
 
         #### cross_orientation_correlation magnitude ####
         # Symmetry M_{i,j} = M_{j,i}. Diagonal elements are redundant with the
         # central elements of acm matrices. Last scale is full of 0's
         # Start with 1's and set redundant elements to 0
-        cocm_mask = torch.ones((n_orientations, n_orientations, n_scales+1))
+        cocm_mask = torch.ones((n_orientations, n_orientations, n_scales + 1))
         # Template of redundant indices (diagonals are redundant)
         triu_inds = torch.triu_indices(n_orientations, n_orientations)
         cocm_mask[triu_inds[0], triu_inds[1], :] = 0
         # Set to 0 last scale that is not in the paper
         cocm_mask[:, :, -1] = 0
-        mask_original['cross_orientation_correlation_magnitude'] = cocm_mask.bool()
+        mask_original["cross_orientation_correlation_magnitude"] = cocm_mask.bool()
 
         #### cross_scale_correlation_magnitude ####
         # No symmetry. Last scale is always 0
         cscm_mask = torch.ones((n_orientations, n_orientations, n_scales))
-        cscm_mask[:,:,-1] = 0
-        mask_original['cross_scale_correlation_magnitude'] = cscm_mask.bool()
+        cscm_mask[:, :, -1] = 0
+        mask_original["cross_scale_correlation_magnitude"] = cscm_mask.bool()
 
         #### cross_orientation_correlation_real ####
         # Not included in paper's statistics
-        mask_original['cross_orientation_correlation_real'] = torch.zeros((n_orientations*2, n_orientations*2, n_scales+1)).bool()
+        mask_original["cross_orientation_correlation_real"] = torch.zeros(
+            (n_orientations * 2, n_orientations * 2, n_scales + 1)
+        ).bool()
 
         #### cross_scale_correlation_real ####
         # No symmetry. Bottom half of matrices are 0's always.
         # Last scale is not included in paper's statistics
-        cscr_mask = torch.ones((n_orientations*2, n_orientations*2, n_scales))
+        cscr_mask = torch.ones((n_orientations * 2, n_orientations * 2, n_scales))
         cscr_mask[(n_orientations):, :, :] = 0
-        cscr_mask[:, :, (n_scales-1):] = 0
-        mask_original['cross_scale_correlation_real'] = cscr_mask.bool()
+        cscr_mask[:, :, (n_scales - 1) :] = 0
+        mask_original["cross_scale_correlation_real"] = cscr_mask.bool()
 
         ### var highpass residual ####
         # Not redundant
-        mask_original['var_highpass_residual'] = torch.tensor(True)
+        mask_original["var_highpass_residual"] = torch.tensor(True)
 
         ### Adjust dictionary for correlation matrices ####
         if self.use_true_correlations:
             # Constant 1's in the correlation matrices not in original set
-            ctrind = torch.tensor([n//2])
-            mask_original['auto_correlation_reconstructed'][ctrind, ctrind, :] = False
-            mask_original['auto_correlation_magnitude'][ctrind, ctrind, :, :] = False
+            ctrind = torch.tensor([n // 2])
+            mask_original["auto_correlation_reconstructed"][ctrind, ctrind, :] = False
+            mask_original["auto_correlation_magnitude"][ctrind, ctrind, :, :] = False
             # Remove from original set the diagonal elements of
             # cross_orientation_correlation_magnitude matrices
             # that are 1's in correlation matrices
             dgind = torch.arange(n_orientations)
-            mask_original['cross_orientation_correlation_magnitude'][dgind, dgind, :-1] = True
+            mask_original["cross_orientation_correlation_magnitude"][
+                dgind, dgind, :-1
+            ] = True
         return mask_original
-
 
     def forward(self, image, scales=None, remove_stats=True):
         r"""Generate the minimal, mixed texture representation.
@@ -205,8 +217,10 @@ class PortillaSimoncelliMinimalMixture(po.simul.PortillaSimoncelli):
 
         """
         if image.shape[0] != 1 and image.shape[0] != self.im_weights.shape[-1]:
-            raise ValueError(f"input image must have 1 or {self.im_weights.shape[-1]} "
-                             f"elements on the batch dim, but has {image.shape[0]}!")
+            raise ValueError(
+                f"input image must have 1 or {self.im_weights.shape[-1]} "
+                f"elements on the batch dim, but has {image.shape[0]}!"
+            )
         stats_vec_all = []
         for img in image:
             # create the representation vector with (with all scales)
@@ -220,14 +234,13 @@ class PortillaSimoncelliMinimalMixture(po.simul.PortillaSimoncelli):
             stats_vec_all.append(stats_vec)
         stats_vec_all = torch.cat(stats_vec_all)
         # weighted sum across that first dimension
-        stats_vec_all = torch.einsum('k, k c s -> c s', self.im_weights, stats_vec_all)
+        stats_vec_all = torch.einsum("k, k c s -> c s", self.im_weights, stats_vec_all)
         # add back the first dim, as metamer needs 3d outputs of models
         return stats_vec_all.unsqueeze(0)
 
 
 class MetamerMixture(po.synth.MetamerCTF):
-    r""" Extending metamer synthesis, for mixing N images.
-    """
+    r"""Extending metamer synthesis, for mixing N images."""
 
     def _initialize(self, initial_image):
         """Initialize the metamer.
@@ -244,14 +257,15 @@ class MetamerMixture(po.synth.MetamerCTF):
 
         """
         if initial_image.ndimension() < 4:
-            raise Exception("initial_image must be torch.Size([n_batch"
-                            ", n_channels, im_height, im_width]) but got "
-                            f"{initial_image.size()}")
+            raise Exception(
+                "initial_image must be torch.Size([n_batch"
+                ", n_channels, im_height, im_width]) but got "
+                f"{initial_image.size()}"
+            )
         # the difference between this and the regular version of Metamer is that
         # the regular version requires synthesized_signal and target_signal to have
         # the same shape, and here target_signal is (k, 1, h, w), not (1, 1, h, w)
         metamer = initial_image.clone().detach()
-        metamer = metamer.to(dtype=self.image.dtype,
-                             device=self.image.device)
+        metamer = metamer.to(dtype=self.image.dtype, device=self.image.device)
         metamer.requires_grad_()
         self._metamer = metamer
