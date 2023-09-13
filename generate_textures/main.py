@@ -1,27 +1,37 @@
 #!/usr/bin/env py3
 
-import torch
-from .models import PortillaSimoncelliMinimalMixture, MetamerMixture
-import plenoptic as po
+import json
+import os
+import os.path as op
+import shutil
+from datetime import datetime
 from typing import Dict, Literal, Optional
+
+import git
+import imageio
+import numpy as np
+import plenoptic as po
+import torch
 import yaml
+
+from .models import MetamerMixture, PortillaSimoncelliMinimalMixture
 
 
 def read_yml(config_path: str):
-    """Read config from path and parse Nones. """
+    """Read config from path and parse Nones."""
     with open(config_path) as f:
         kwargs = yaml.safe_load(f.read())
     for k, v in kwargs.items():
         if isinstance(v, dict):
             for kk, vv in v.items():
-                if vv == 'None':
+                if vv == "None":
                     kwargs[k][kk] = None
-        if v == 'None':
+        if v == "None":
             kwargs[k] = None
     return kwargs
-            
 
-def prep_imgs(imgs_dict: Dict[str, float], device: Literal['cpu', 'gpu']):
+
+def prep_imgs(imgs_dict: Dict[str, float], device: Literal["cpu", "gpu"]):
     """Prepare images.
 
     All images are grayscale and rescaled to lie in the range [0, 1].
@@ -55,12 +65,12 @@ def prep_imgs(imgs_dict: Dict[str, float], device: Literal['cpu', 'gpu']):
 def generate_texture(
     images_dict: Dict[str, float],
     synth_iter: int = 1000,
-    change_scale_criterion: Optional[float]=None,
+    change_scale_criterion: Optional[float] = None,
     ctf_iters_to_check: int = 3,
     opt_hyperparams: Dict = {"lr": 0.02, "amsgrad": True},
     model_params: Dict = {},
     img_init: str = "random",
-    device: Literal['cpu', 'gpu'] = "cpu",
+    device: Literal["cpu", "gpu"] = "cpu",
 ):
     """Prepare images, model and generate a mixed texture!
 
@@ -118,16 +128,49 @@ def generate_texture(
     )
     return met
 
+
 # ADD:
 # - create output plots:
 #   - imshow with input images (relative weights in title) and metamer
 #   - representation of each input image, then representation error (maybe in separate)?
 #   - synthesis status with just metamer and loss and pixel vals?
-# - create output dir: copy config file, add readme
-#   with git hash of this and plenoptic version
 # - in that dir, save: met, output plots, metamer image itself
+# - add command-line function to run PSMinimal model on an image and save output?
+#   - along with mixture?
 def main(config_path: str, output_dir: str):
-    """
+    """Create metamer, based on config, and save outputs.
+
+    Within ``output_dir``, we create a "timestamp" directory (DDMMYY_HHMMSS)
+    and save all of our outputs within that. Thus, if you have several jobs
+    launching at the *exact* same second, they will conflict and we thus raise
+    an Exception.
+
+    The timestamp directory contains:
+    - ``metamer.pt``, the actual metamer object.
+    - the configuration file found at ``config_path`` (name unchanged)
+    - ``metamer.png``, the texture metamer image, as an 8 bit
+
+    Parameters
+    ----------
+    config_path :
+        Path to a yml file containing the configuration options. See
+        ``config.yml`` included in repo for an example.
+    output_dir :
+        Path to a containing directory, which we'll create the output directory
+        in.
+
     """
     config = read_yml(config_path)
     met = generate_texture(**config)
+    now = datetime.now().strftime("%d%m%y_%H%M%S")
+    output_dir = op.join(output_dir, now)
+    os.makedirs(output_dir)
+    shutil.copy(config_path, output_dir)
+    met.save(op.join(output_dir, "metamer.pt"))
+    wishart_version = git.Repo(op.dirname(op.realpath(__file__))).head.object.hexsha
+    with open(op.join(output_dir, "versions.json"), "w") as f:
+        json.dump({"plenoptic": po.__version__, "wishart-textures": wishart_version}, f)
+    # Convert metamer image to 8bit int and save
+    metamer_img = np.clip(po.to_numpy(met.metamer), 0, 1)
+    metamer_img = (metamer_img * np.iinfo(np.uint8).max).astype(np.uint8)
+    imageio.imsave(op.join(output_dir, "metamer.png"), metamer_img)
