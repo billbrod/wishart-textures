@@ -3,8 +3,12 @@
 from collections import OrderedDict
 
 import numpy as np
+from glob import glob
+import os.path as op
 import plenoptic as po
 import torch
+
+from . import utils
 
 
 class PortillaSimoncelliMinimalMixture(po.simul.PortillaSimoncelli):
@@ -256,6 +260,8 @@ class MetamerMixture(po.synth.MetamerCTF):
             noise lying between 0 and 1.
 
         """
+        if initial_image is None:
+            initial_image = torch.rand_like(self.image[0].unsqueeze(0)) * 0.01 + self.image.mean()
         if initial_image.ndimension() < 4:
             raise Exception(
                 "initial_image must be torch.Size([n_batch"
@@ -269,3 +275,39 @@ class MetamerMixture(po.synth.MetamerCTF):
         metamer = metamer.to(dtype=self.image.dtype, device=self.image.device)
         metamer.requires_grad_()
         self._metamer = metamer
+
+
+def load_metamer_mixture(file_path: str) -> MetamerMixture:
+    """Load MetamerMixture object found at file.
+
+    Note, this keeps everything on the cpu. To move it over to the GPU after
+    loading, run ``metamer.to('gpu')``
+
+    Parameters
+    ----------
+    file_path :
+        Path to the ``metamer.pt`` object. We assume there's a single yml file
+        in the directory with this file, which tells us how the model was
+        initialized.
+
+    Returns
+    -------
+    metamer :
+        The MetamerMixture object saved at file_path
+
+    """
+    yml_file = glob(op.join(op.dirname(file_path), '*.yml'))
+    if len(yml_file) != 1:
+        raise Exception(f"We expect to find a single yml file in the same directory as {file_path}, but found {len(yml_file)} instead!")
+    config = utils.read_yml(yml_file[0])
+    imgs, weights = utils.prep_imgs(config['images_dict'], 'cpu')
+    ps = PortillaSimoncelliMinimalMixture(imgs.shape[-2:], weights, **config['model_params'])
+    ps.eval()
+    met = MetamerMixture(
+        imgs,
+        ps,
+        po.tools.optim.l2_norm,
+        coarse_to_fine="together",
+    )
+    met.load(file_path)
+    return met

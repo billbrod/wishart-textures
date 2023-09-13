@@ -6,88 +6,17 @@ import os
 import os.path as op
 import shutil
 from datetime import datetime
-from typing import Dict, Literal, Optional, Tuple
+from typing import Dict, Literal
 
 import git
 import imageio
 import numpy as np
 import plenoptic as po
 import torch
-import yaml
 from torch import Tensor
 
-from . import display
+from . import display, utils
 from .models import MetamerMixture, PortillaSimoncelliMinimalMixture
-
-
-def read_yml(config_path: str) -> dict:
-    """Read config from path, parsing Nones and scientific notation."""
-    with open(config_path) as f:
-        kwargs = yaml.safe_load(f.read())
-    for k, v in kwargs.items():
-        if isinstance(v, dict):
-            for kk, vv in v.items():
-                if vv == "None":
-                    kwargs[k][kk] = None
-                elif isinstance(vv, str):
-                    try:
-                        kwargs[k][kk] = float(vv)
-                    except ValueError:
-                        pass
-        else:
-            if v == "None":
-                kwargs[k] = None
-            elif isinstance(v, str):
-                try:
-                    kwargs[k] = float(v)
-                except ValueError:
-                    pass
-    return kwargs
-
-
-def prep_imgs(
-    imgs_dict: Dict[str, float],
-    device: Literal["cpu", "gpu"],
-) -> Tuple[Tensor, Tensor]:
-    """Prepare images.
-
-    All images are grayscale and rescaled to lie in the range [0, 1].
-
-    If any of the weights in imgs_dict are 0, we skip that image.
-
-    If any weight is negative or if their sum is not 1, this raises a
-    ValueError.
-
-    Parameters
-    ----------
-    imgs_dict :
-        Dictionary where keys are paths to images to load and values are
-        their relative weights.
-    device :
-        Which device to put tensors on.
-
-    Returns
-    -------
-    images :
-        4d tensor of images of shape (k, 1, h, w).
-    weights :
-        1d tensor of weights of shape (k,)
-
-    """
-    imgs = []
-    weights = []
-    for k, v in imgs_dict.items():
-        if v == 0:
-            continue
-        imgs.append(k)
-        weights.append(v)
-    imgs = po.load_images(imgs).to(device)
-    weights = torch.Tensor(weights).to(device)
-    if (weights < 0).any():
-        raise ValueError("Negative weight!")
-    if weights.sum() != 1:
-        raise ValueError("Weights must sum to 1!")
-    return imgs, weights
 
 
 def generate_texture(
@@ -130,14 +59,14 @@ def generate_texture(
         The MetamerMixture object, with synthesis completed.
 
     """
-    imgs, weights = prep_imgs(images_dict, device)
+    imgs, weights = utils.prep_imgs(images_dict, device)
     # this is a good initial image for texture synthesis, though you can change
     # it if you'd like
     if img_init == "random":
-        img_init = torch.rand_like(imgs[0].unsqueeze(0) * 0.01 + imgs.mean())
+        img_init = torch.rand_like(imgs[0].unsqueeze(0)) * 0.01 + imgs.mean()
     else:
         img_init = po.load_images(img_init)
-    ps = PortillaSimoncelliMinimalMixture(imgs.shape[-2:], weights, **model_params)
+    ps = PortillaSimoncelliMinimalMixture(imgs.shape[-2:], weights, **model_params).to(device)
     ps.eval()
     met = MetamerMixture(
         imgs,
@@ -168,7 +97,17 @@ def main(config_path: str, output_dir: str):
     The timestamp directory contains:
     - ``versions.json``, a json file containing the git hash of this repo and
       the version of plenoptic used.
-    - ``metamer.pt``, the actual metamer object.
+    - ``metamer.pt``, the actual metamer object. To examine it, use the
+      ``generate_textures.models.load_metamer_mixture`` function. See
+      plenoptic's documentation for more details on how to interact with
+      metamer objects.
+    - ``metamer_representation.pt``, torch.Tensor of shape (1, 1, s) (where
+      s~=700) giving the representation of the synthesized metamer. Load in
+      using ``torch.load``.
+    - ``mixed_input_image_representation.pt``, torch.Tensor of shape (1, 1, s)
+      (where s~=700) giving the weighted representation of the input images. If
+      synthesis converged and went perfectly, this should be identical to
+      ``metamer_representation.pt``.  Load in using ``torch.load``.
     - the configuration file found at ``config_path`` (name unchanged)
     - ``metamer.png``, the texture metamer image, as an 8 bit
     - ``synthesis_status.svg``, plot showing the loss over time and the final metamer
@@ -186,13 +125,17 @@ def main(config_path: str, output_dir: str):
         in.
 
     """
-    config = read_yml(config_path)
+    config = utils.read_yml(config_path)
     met = generate_texture(**config)
     now = datetime.now().strftime("%d%m%y_%H%M%S")
     output_dir = op.join(output_dir, now)
     os.makedirs(output_dir)
     shutil.copy(config_path, output_dir)
     met.save(op.join(output_dir, "metamer.pt"))
+    met_rep = met.model(met.metamer)
+    torch.save(met_rep, op.join(output_dir, "metamer_representation.pt"))
+    mixed_rep = met.model(met.image)
+    torch.save(mixed_rep, op.join(output_dir, "mixed_input_image_representation.pt"))
     wishart_version = git.Repo(op.join(op.dirname(op.realpath(__file__)), '..')).head.object.hexsha
     with open(op.join(output_dir, "versions.json"), "w") as f:
         json.dump({"plenoptic": po.__version__, "wishart-textures": wishart_version}, f)
@@ -225,7 +168,16 @@ if __name__ == "__main__":
     The timestamp directory contains:
     - versions.json, a json file containing the git hash of this repo and
       the version of plenoptic used.
-    - metamer.pt, the actual metamer object.
+    - metamer.pt, the actual metamer object. To examine it, use the
+      generate_textures.models.load_metamer_mixture function. See plenoptic's
+      documentation for more details on how to interact with metamer objects.
+    - metamer_representation.pt, torch.Tensor of shape (1, 1, s) (where
+      s~=700) giving the representation of the synthesized metamer. Load in
+      using torch.load
+    - mixed_input_image_representation.pt, torch.Tensor of shape (1, 1, s)
+      (where s~=700) giving the weighted representation of the input images. If
+      synthesis converged and went perfectly, this should be identical to
+      ``metamer_representation.pt``. Load in using torch.load
     - the configuration file found at config_path (name unchanged)
     - metamer.png, the texture metamer image, as an 8 bit int
     - synthesis_status.svg, plot showing the loss over time and the final metamer
