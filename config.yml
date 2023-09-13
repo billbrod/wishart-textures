@@ -1,23 +1,44 @@
+# dictionary between target images (must be grayscale) and their relative
+# weights. The /mnt/ceph/users/ccn/common_data/texture_images/ directory has a
+# small sampling of textures used in the original paper. The weights here must
+# all be non-negative and sum to 1. Any images with a weight of zero will be
+# ignored.
 images_dict:
-  /mnt/ceph/users/ccn/common_data/texture_images/fig4a.jpg: .5
-  /mnt/ceph/users/ccn/common_data/texture_images/fig4b.jpg: .5
+  /mnt/simons/ccn/common_data/texture_images/fig4a.jpg: .5
+  /mnt/simons/ccn/common_data/texture_images/fig4b.jpg: .5
 
+# Whether to run synthesis on the GPU or CPU. GPU is much faster.
 device: "cpu"
 
+# Arguments to pass to metamer.synthesize(), see its documentation for details
+#(any argumenti t accepts is allowed). See
+#https://plenoptic.readthedocs.io/en/latest/tutorials/models/Metamer-Portilla-Simoncelli.html
+#for examples of successful synthesis and the arguments they use. You probably
+#will need to tinker with these.
 metamer_synthesis_params:
-  max_iter: 1000
+  max_iter: 2000
+  stop_criterion: 1e-5
   change_scale_criterion: None
   ctf_iters_to_check: 3
-  stop_criterion: 1e-5
 
+# Optimization-related hyperparameters to pass to the torch.optim.Adam object.
+# See its documentation for more details and arguments (any argument it accepts
+# is allowed). You probably will need to tinker with lr.
 opt_hyperparams:
   lr: .02
   amsgrad: True
 
+# Parameters of the Portilla-Simoncelli model. See its docstring for more
+# details, but you probably don't want to change these. The number of stats in
+# the output will increase with any of the numbers below, and the value of ~700
+# is for (4, 4, 7)
 model_params:
   n_scales: 4
   n_orientations: 4
   spatial_corr_width: 7
-  use_true_correlations: True
 
+# How to initialize the mixed texture metamer. If "random", we use a sample of
+# uniform noise from [m-.01, m+.01], where m is the overall mean of the input
+# images. Otherwise, should be the path to a grayscale image with the same
+# dimensions as the input images.
 img_init: "random"
