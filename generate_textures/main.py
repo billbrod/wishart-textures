@@ -16,6 +16,7 @@ import yaml
 from torch import Tensor
 
 from .models import MetamerMixture, PortillaSimoncelliMinimalMixture
+from . import display
 
 
 def read_yml(config_path: str) -> dict:
@@ -194,3 +195,9 @@ def main(config_path: str, output_dir: str):
     metamer_img = np.clip(po.to_numpy(met.metamer), 0, 1)
     metamer_img = (metamer_img * np.iinfo(np.uint8).max).astype(np.uint8)
     imageio.imsave(op.join(output_dir, "metamer.png"), metamer_img)
+    fig = po.synth.metamer.plot_synthesis_status(met, included_plots=['display_metamer', 'plot_loss'])
+    fig.savefig(op.join(output_dir, "synthesis_status.svg"))
+    fig = display.input_comparison(met)
+    fig.savefig(op.join(output_dir, "input_comparison.svg"))
+    fig = display.plot_representation_error(met)
+    fig.savefig(op.join(output_dir, "representation_error.svg"))

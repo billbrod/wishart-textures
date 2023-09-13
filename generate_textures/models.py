@@ -181,7 +181,7 @@ class PortillaSimoncelliMinimalMixture(po.simul.PortillaSimoncelli):
         return mask_original
 
 
-    def forward(self, image, scales=None):
+    def forward(self, image, scales=None, remove_stats=True):
         r"""Generate the minimal, mixed texture representation.
 
         Parameters
@@ -193,6 +193,10 @@ class PortillaSimoncelliMinimalMixture(po.simul.PortillaSimoncelli):
             Which scales to include in the returned representation. If an empty
             list (the default), we include all scales. Otherwise, can contain
             subset of values present in this model's ``scales`` attribute.
+        remove_stats : bool, optional
+            Whether to remove redundant stats or not. Won't affect synthesis,
+            but some of the helper functions for e.g., plotting, require the
+            output to include those stats
 
         Returns
         -------
@@ -207,8 +211,9 @@ class PortillaSimoncelliMinimalMixture(po.simul.PortillaSimoncelli):
         for img in image:
             # create the representation vector with (with all scales)
             stats_vec = super().forward(img.unsqueeze(0))
-            # Remove the redundant stats
-            stats_vec = stats_vec.index_select(-1, self.statistics_mask)
+            if remove_stats:
+                # Remove the redundant stats
+                stats_vec = stats_vec.index_select(-1, self.statistics_mask)
             # then remove any scales we don't want (for coarse-to-fine)
             if scales is not None:
                 stats_vec = self.remove_scales(stats_vec, scales)
