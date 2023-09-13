@@ -19,7 +19,7 @@ from .models import MetamerMixture, PortillaSimoncelliMinimalMixture
 
 
 def read_yml(config_path: str) -> dict:
-    """Read config from path and parse Nones."""
+    """Read config from path, parsing Nones and scientific notation."""
     with open(config_path) as f:
         kwargs = yaml.safe_load(f.read())
     for k, v in kwargs.items():
@@ -27,15 +27,26 @@ def read_yml(config_path: str) -> dict:
             for kk, vv in v.items():
                 if vv == "None":
                     kwargs[k][kk] = None
-        if v == "None":
-            kwargs[k] = None
+                elif isinstance(vv, str):
+                    try:
+                        kwargs[k][kk] = float(vv)
+                    except ValueError:
+                        pass
+        else:
+            if v == "None":
+                kwargs[k] = None
+            elif isinstance(v, str):
+                try:
+                    kwargs[k] = float(v)
+                except ValueError:
+                    pass
     return kwargs
 
 
 def prep_imgs(
     imgs_dict: Dict[str, float],
     device: Literal["cpu", "gpu"],
-) -> Tuple(Tensor, Tensor):
+) -> Tuple[Tensor, Tensor]:
     """Prepare images.
 
     All images are grayscale and rescaled to lie in the range [0, 1].
@@ -79,9 +90,7 @@ def prep_imgs(
 
 def generate_texture(
     images_dict: Dict[str, float],
-    synth_iter: int = 1000,
-    change_scale_criterion: Optional[float] = None,
-    ctf_iters_to_check: int = 3,
+    metamer_synthesis_params: Dict = {'change_scale_criterion': None, 'ctf_iters_to_check': 3},
     opt_hyperparams: Dict = {"lr": 0.02, "amsgrad": True},
     model_params: Dict = {},
     img_init: str = "random",
@@ -94,18 +103,10 @@ def generate_texture(
     images_dict :
         Dictionary where keys are paths to images to load and values are
         their relative weights.
-    synth_iter :
-        The maximum number of iterations to run before we end synthesis.
-    change_scale_criterion
-        Scale-specific analogue of ``change_scale_criterion``: we consider
-        a given scale finished (and move onto the next) if the loss has
-        changed less than this in the past ``ctf_iters_to_check``
-        iterations. If ``None``, we'll change scales as soon as we've spent
-        ``ctf_iters_to_check`` on a given scale.
-    ctf_iters_to_check
-        Scale-specific analogue of ``stop_iters_to_check``: how many
-        iterations back in order to check in order to see if we should
-        switch scales.
+    metamer_synthesis_params :
+        Dictionary of parameters to pass to the MetamerMixture object when
+        starting synthesis. See the docstring of Metamer's ``synthesis`` method
+        for details.
     opt_hyperparams :
         Dictionary of hyper-parameters to pass to torch.optim.Adam on init.
     model_params :
@@ -142,9 +143,7 @@ def generate_texture(
     opt = torch.optim.Adam([met.metamer], **opt_hyperparams)
     met.synthesize(
         optimizer=opt,
-        max_iter=synth_iter,
-        change_scale_criterion=change_scale_criterion,
-        ctf_iters_to_check=ctf_iters_to_check,
+        **metamer_synthesis_params,
     )
     return met
 
