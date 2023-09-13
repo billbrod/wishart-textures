@@ -20,7 +20,7 @@ All requirements are listed in the included requirements file, and can be
 installed (ideally, in a clean virtual environment) with:
 
 ``` sh
-pip -r requirements.txt
+pip install -r requirements.txt
 ```
 
 This should work with python version at or above 3.9
