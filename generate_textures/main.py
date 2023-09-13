@@ -127,6 +127,8 @@ def main(config_path: str, output_dir: str):
     """
     config = utils.read_yml(config_path)
     met = generate_texture(**config)
+    # move everything over to the cpu for plotting and saving
+    met.to('cpu')
     now = datetime.now().strftime("%d%m%y_%H%M%S")
     output_dir = op.join(output_dir, now)
     os.makedirs(output_dir)
