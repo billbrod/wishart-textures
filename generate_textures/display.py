@@ -8,13 +8,32 @@ import matplotlib.pyplot as plt
 import plenoptic as po
 import torch
 
-from .models import MetamerMixture, PortillaSimoncelliMinimalMixture
-
-# - create output plots:
-#   - representation of each input image, then representation error (maybe in separate)?
+from .models import MetamerMixture
 
 
-def plot_representation_error(metamer, col_wrap: Optional[int] = None):
+def plot_representation_error(
+    metamer: MetamerMixture, col_wrap: Optional[int] = None
+) -> mpl.figure.Figure:
+    """Plot representation of each input image, metamer, and representation error.
+
+    The representations will all have the same ylim for each subplot, while the
+    representation error's ylim will be different.
+
+    Parameters
+    ----------
+    metamer :
+        A MetamerMixture object that has completed synthesis using an instance
+        of PortillaSimoncelliMinimalMixture
+    col_wrap :
+        How many columns to have in the image. If None, we use the number of
+        input images (e.g., ``metamer.images.shape[0]``).
+
+    Returns
+    -------
+    fig :
+        Figure of images
+
+    """
     # create dummy PS model, same args as minimal one, and run it on an image to create ps.representation
     # rep = ps_model(img, remove_stats=False) - ps_model(metamer.metamer, remove_stats=False)
     # ps_dummy.plot_representation(rep)
@@ -33,7 +52,7 @@ def plot_representation_error(metamer, col_wrap: Optional[int] = None):
         col_wrap = metamer.image.shape[0]
     n_plots = metamer.image.shape[0] + 1
     n_rows = math.ceil(n_plots / col_wrap) + 1
-    figsize = (5 * n_rows, 5 * col_wrap)
+    figsize = (12 * col_wrap, 5 * n_rows)
     fig, axes = plt.subplots(
         n_rows, col_wrap, sharex=True, sharey=True, figsize=figsize
     )
@@ -65,7 +84,7 @@ def plot_representation_error(metamer, col_wrap: Optional[int] = None):
             ax.set_visible(False)
     for ax in child_axes:
         ax.set_ylim(ylim)
-    return fig, axes
+    return fig
 
 
 def input_comparison(
@@ -80,6 +99,8 @@ def input_comparison(
         A MetamerMixture object that has completed synthesis using an instance
         of PortillaSimoncelliMinimalMixture
     col_wrap :
+        How many columns to have in the image. If None, we use the number of
+        input images (e.g., ``metamer.images.shape[0]``).
 
     Returns
     -------

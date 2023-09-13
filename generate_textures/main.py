@@ -1,5 +1,6 @@
 #!/usr/bin/env py3
 
+import argparse
 import json
 import os
 import os.path as op
@@ -7,7 +8,6 @@ import shutil
 from datetime import datetime
 from typing import Dict, Literal, Optional, Tuple
 
-import click
 import git
 import imageio
 import numpy as np
@@ -120,7 +120,7 @@ def generate_texture(
     img_init :
         How to initialize metamer synthesis, either "random" or a path. If
         random, we initialize with uniform noise from [m-.01, m+.01], where m
-        is the overall mean as the input images.
+        is the overall mean of the input images.
     device :
         Which device to put tensors on.
 
@@ -138,6 +138,7 @@ def generate_texture(
     else:
         img_init = po.load_images(img_init)
     ps = PortillaSimoncelliMinimalMixture(imgs.shape[-2:], weights, **model_params)
+    ps.eval()
     met = MetamerMixture(
         imgs,
         ps,
@@ -156,9 +157,6 @@ def generate_texture(
 # - add command-line function to run PSMinimal model on an image and save output?
 #   - along with mixture?
 # - add something to load in metamer, directly from output dir
-@click.command()
-@click.argument("config_path")
-@click.argument("output_dir")
 def main(config_path: str, output_dir: str):
     """Create metamer, based on config, and save outputs.
 
@@ -168,9 +166,15 @@ def main(config_path: str, output_dir: str):
     and we thus raise an Exception.
 
     The timestamp directory contains:
+    - ``versions.json``, a json file containing the git hash of this repo and
+      the version of plenoptic used.
     - ``metamer.pt``, the actual metamer object.
     - the configuration file found at ``config_path`` (name unchanged)
     - ``metamer.png``, the texture metamer image, as an 8 bit
+    - ``synthesis_status.svg``, plot showing the loss over time and the final metamer
+    - ``input_comparison.svg``, plot the input images, with weights, and the final metamer
+    - ``representation_error.svg``, plot the representation of each input image,
+      the final metamer, and the representation error.
 
     Parameters
     ----------
@@ -189,18 +193,54 @@ def main(config_path: str, output_dir: str):
     os.makedirs(output_dir)
     shutil.copy(config_path, output_dir)
     met.save(op.join(output_dir, "metamer.pt"))
-    wishart_version = git.Repo(op.dirname(op.realpath(__file__))).head.object.hexsha
+    wishart_version = git.Repo(op.join(op.dirname(op.realpath(__file__)), '..')).head.object.hexsha
     with open(op.join(output_dir, "versions.json"), "w") as f:
         json.dump({"plenoptic": po.__version__, "wishart-textures": wishart_version}, f)
     # Convert metamer image to 8bit int and save
-    metamer_img = np.clip(po.to_numpy(met.metamer), 0, 1)
+    metamer_img = np.clip(po.to_numpy(met.metamer.squeeze()), 0, 1)
     metamer_img = (metamer_img * np.iinfo(np.uint8).max).astype(np.uint8)
     imageio.imsave(op.join(output_dir, "metamer.png"), metamer_img)
     fig = po.synth.metamer.plot_synthesis_status(
         met, included_plots=["display_metamer", "plot_loss"]
-    )
-    fig.savefig(op.join(output_dir, "synthesis_status.svg"))
+    )[0]
+    fig.savefig(op.join(output_dir, "synthesis_status.svg"),
+                bbox_inches='tight')
     fig = display.input_comparison(met)
     fig.savefig(op.join(output_dir, "input_comparison.svg"))
     fig = display.plot_representation_error(met)
-    fig.savefig(op.join(output_dir, "representation_error.svg"))
+    fig.savefig(op.join(output_dir, "representation_error.svg"),
+                bbox_inches='tight')
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawTextHelpFormatter,
+        description="""Generate some mixed textures!
+
+    After synthesis finishes, we create a "timestamp" directory (DDMMYY_HHMMSS)
+    within ``output_dir`` and save all of our outputs within that. Thus, if you
+    have several jobs finishing at the *exact* same second, they will conflict
+    and we thus raise an Exception.
+
+    The timestamp directory contains:
+    - versions.json, a json file containing the git hash of this repo and
+      the version of plenoptic used.
+    - metamer.pt, the actual metamer object.
+    - the configuration file found at config_path (name unchanged)
+    - metamer.png, the texture metamer image, as an 8 bit int
+    - synthesis_status.svg, plot showing the loss over time and the final metamer
+    - input_comparison.svg, plot the input images, with weights, and the final metamer
+    - representation_error.svg, plot the representation of each input image,
+      the final metamer, and the representation error.
+    """,
+    )
+    parser.add_argument(
+        "config_path",
+        help="Path to a yml file containing the configuration options.",
+    )
+    parser.add_argument(
+        "output_dir",
+        help="Path to put the output directory in.",
+    )
+    args = vars(parser.parse_args())
+    main(**args)
