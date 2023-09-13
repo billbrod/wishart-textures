@@ -134,16 +134,17 @@ def generate_texture(
 #   - imshow with input images (relative weights in title) and metamer
 #   - representation of each input image, then representation error (maybe in separate)?
 #   - synthesis status with just metamer and loss and pixel vals?
-# - in that dir, save: met, output plots, metamer image itself
+# - save output plots
 # - add command-line function to run PSMinimal model on an image and save output?
 #   - along with mixture?
+# - add something to load in metamer, directly from output dir
 def main(config_path: str, output_dir: str):
     """Create metamer, based on config, and save outputs.
 
-    Within ``output_dir``, we create a "timestamp" directory (DDMMYY_HHMMSS)
-    and save all of our outputs within that. Thus, if you have several jobs
-    launching at the *exact* same second, they will conflict and we thus raise
-    an Exception.
+    After synthesis finishes, we create a "timestamp" directory (DDMMYY_HHMMSS)
+    within ``output_dir`` and save all of our outputs within that. Thus, if you
+    have several jobs finishing at the *exact* same second, they will conflict
+    and we thus raise an Exception.
 
     The timestamp directory contains:
     - ``metamer.pt``, the actual metamer object.
