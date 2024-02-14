@@ -11,7 +11,7 @@ images_dict:
 device: "cpu"
 
 # Arguments to pass to metamer.synthesize(), see its documentation for details
-#(any argumenti t accepts is allowed). See
+#(any argument it accepts is allowed). See
 #https://plenoptic.readthedocs.io/en/latest/tutorials/models/Metamer-Portilla-Simoncelli.html
 #for examples of successful synthesis and the arguments they use. You probably
 #will need to tinker with these.

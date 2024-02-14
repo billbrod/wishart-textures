@@ -16,7 +16,7 @@ import torch
 from torch import Tensor
 
 from . import display, utils
-from .models import MetamerMixture, PortillaSimoncelliMinimalMixture
+from .models import MetamerMixture, PortillaSimoncelliMixture
 
 
 def generate_texture(
@@ -66,7 +66,7 @@ def generate_texture(
         img_init = torch.rand_like(imgs[0].unsqueeze(0)) * 0.01 + imgs.mean()
     else:
         img_init = po.load_images(img_init)
-    ps = PortillaSimoncelliMinimalMixture(imgs.shape[-2:], weights, **model_params).to(device)
+    ps = PortillaSimoncelliMixture(imgs.shape[-2:], weights, **model_params).to(device)
     ps.eval()
     met = MetamerMixture(
         imgs,

@@ -35,15 +35,12 @@ def plot_representation_error(
 
     """
     # create dummy PS model, same args as minimal one, and run it on an image to create ps.representation
-    # rep = ps_model(img, remove_stats=False) - ps_model(metamer.metamer, remove_stats=False)
-    # ps_dummy.plot_representation(rep)
     ps_mixture = metamer.model
     ps_dummy = po.simul.PortillaSimoncelli(
         ps_mixture.image_shape,
         ps_mixture.n_scales,
         ps_mixture.n_orientations,
         ps_mixture.spatial_corr_width,
-        ps_mixture.use_true_correlations,
     )
     # need to run the dummy model on an image to initialize some internal
     # variables
@@ -66,15 +63,13 @@ def plot_representation_error(
     for t, ax, img in zip(
         titles, axes.flatten(), torch.cat([metamer.image, metamer.metamer])
     ):
-        rep = ps_mixture(img.unsqueeze(0), remove_stats=False)
+        rep = ps_mixture(img.unsqueeze(0))
         _, rep_axes = ps_dummy.plot_representation(rep, ax=ax, ylim=False)
         ylim[0] = min([ylim[0], *[a.get_ylim()[0] for a in rep_axes]])
         ylim[1] = max([ylim[1], *[a.get_ylim()[1] for a in rep_axes]])
         child_axes.extend(rep_axes)
         ax.set_title(t, y=1.05)
-    rep = ps_mixture(metamer.image, remove_stats=False) - ps_mixture(
-        metamer.metamer, remove_stats=False
-    )
+    rep = ps_mixture(metamer.image) - ps_mixture(metamer.metamer)
     # because this is the error plot, it should be different ylim than
     # everyone else
     ps_dummy.plot_representation(rep, ax=axes[-1, 0], ylim=False)
