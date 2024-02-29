@@ -1,4 +1,4 @@
 # this is temporary
-git+https://github.com/LabForComputationalVision/plenoptic.git@ps_refactor
+git+https://github.com/LabForComputationalVision/plenoptic.git
 pyyaml
 gitpython
